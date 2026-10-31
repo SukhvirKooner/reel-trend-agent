@@ -1,0 +1,43 @@
+niche: indian_street_food
+region: IN-DL
+description: >
+  Reels about food sold by street vendors, dhabas, carts and small stalls in India:
+  the food, the vendor, the price, the place, the making process, or the reaction.
+relevance_threshold: 0.6        # quick-tag score needed to count as in-niche
+
+branches:                       # level-1 branches (fixed)
+  - chaat_and_snacks            # golgappe, aloo tikki, samosa, kachori
+  - chinese_and_momos           # momos, chowmein, manchurian, Indo-Chinese
+  - breakfast_and_paratha       # paratha, chole bhature, poha, idli carts
+  - sweets_and_desserts         # jalebi, kulfi, rabri, shakes
+  - non_veg                     # kebabs, tikka, biryani, egg dishes
+  - fusion_and_experiments      # weird combos, "chocolate maggi", viral experiments
+  - vendor_stories              # vendor's struggle, old uncle, kid vendor, emotional
+  - price_and_value             # ₹10 food, cheapest vs costliest, value hunts
+  - hygiene_and_expose          # hygiene checks, "don't eat here"
+  - food_tours_and_places       # market tours, "top 5 in Chandni Chowk"
+
+tag_facets:                     # every tag belongs to one facet → keeps tags tidy
+  dish: [golgappa, aloo_tikki, samosa, kachori, momos, chowmein, chole_bhature, paratha,
+         poha, jalebi, kulfi, rabri, kebab, egg_dish, biryani, maggi, sandwich, chai]
+  format: [vendor_making_closeup, reaction_eating, review_rating, pov, tour, comparison,
+           challenge, story_voiceover, asmr, interview_vendor, price_reveal_list]
+  hook: [price_reveal, extreme_closeup, shock_combo, question_to_viewer, countdown,
+         emotional_open, before_after, sound_hook, text_overlay_claim, vendor_catchphrase]
+  setting: [chandni_chowk, jantar_mantar, connaught_place, lajpat_nagar, karol_bagh,
+            sarojini, old_delhi_generic, highway_dhaba, college_area]
+  audio: [trending_song, original_vendor_sound, voiceover_hindi, voiceover_english,
+          asmr_sound, meme_sound]
+  emotion: [funny, wholesome, shocking, satisfying, nostalgic, disgust]
+
+exploration_keywords:           # used for the scout's exploration nudges
+  chaat_and_snacks: ["golgappe delhi", "aloo tikki street"]
+  chinese_and_momos: ["momos delhi street", "chowmein stall"]
+  breakfast_and_paratha: ["paratha wale gali", "chole bhature delhi"]
+  sweets_and_desserts: ["jalebi street", "kulfi delhi"]
+  non_veg: ["kebab old delhi", "egg street food"]
+  fusion_and_experiments: ["weird street food combination"]
+  vendor_stories: ["hardworking street vendor"]
+  price_and_value: ["10 rupees street food", "cheapest street food delhi"]
+  hygiene_and_expose: ["street food hygiene check"]
+  food_tours_and_places: ["chandni chowk food tour"]

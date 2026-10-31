@@ -1,0 +1,11 @@
+playwright
+anthropic
+pydantic
+streamlit
+pandas
+pyyaml
+python-dotenv
+rapidfuzz
+imagehash
+pillow
+numpy
