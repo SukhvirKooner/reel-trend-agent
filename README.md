@@ -34,13 +34,21 @@ crontab -e  →  */30 * * * * ~/reel-trend-agent/scripts/snapshot_db.sh
 
 ## Dashboard (show this to mentors)
 ```bash
-python -m app.dashboard          # → http://localhost:8080   (Live data · Demo data · frozen backups switch in the header)
+python -m app.dashboard          # → http://localhost:8080   (Live data · Demo data · frozen backups: switch in the sidebar)
 python -m app.report             # → reports/report-*.html   (same page as one offline file to send around)
 ```
-Tabs: **Overview** (KPIs, pipeline funnel, latest decision, how it works) · **Trends** (trend cards: why with
-evidence chart + playbook + example reels; or progress towards the first trend) · **Agent activity** (every decision
-with reason, branch coverage, exploration events) · **Reel analysis** (hook, story, measured edit + sound, drivers,
-view growth) · **View tracking** (sortable). Refreshes in place every 30 s; dark mode follows the system.
+Left sidebar with five pages: **Overview** (plain-English headline: trend found or progress towards the first one,
+agent pulse of its last decisions, KPIs, pipeline funnel, latest decisions, fastest-growing reels, how it works) ·
+**Trends** (one card per trend: key numbers, why it works with confidence + evidence bars, a black "film this
+tomorrow" playbook with a Copy button, example reels) · **Agent activity** (decision feed with Watched/Skipped
+filter, branch coverage, decision mix, exploration events) · **Reel analysis** (searchable cards: hook with a
+position marker on the reel's timeline, story, measured edit + sound, drivers, view growth) · **View tracking**
+(search, status filters, sortable columns).
+
+Presenting: press **1–5** to switch pages, **?** for a plain-English "How to read this" guide, use the sidebar for
+light/dark and **Pause refresh**. The page refreshes in place every 30 s and keeps your page, filters, search text and
+open/closed cards. Times show as "x min ago" in your own time zone. Styles and behaviour live in `app/ui/dashboard.css`
+and `app/ui/dashboard.js`; the page works offline (no CDN, no fonts to download).
 
 ## Demo safety net
 - To freeze the DB, pick a `backups/app-HHMM.db` file in the UI sidebar, or run `DB_PATH=./backups/app-HHMM.db streamlit run ui.py`.

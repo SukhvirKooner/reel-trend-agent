@@ -122,13 +122,18 @@ def build_input(conn, m, kind, key, stats, use_branch_fallback=True):
     feats, an = reel_features(conn, m)
     table = lift_table(winners, others, feats)
 
+    def clean(v):
+        """pandas (esp. 3.x string columns) turns a missing text value into NaN, which is not valid JSON."""
+        return None if v is None or (isinstance(v, float) and pd.isna(v)) else v
+
     def ex(c):
         r = m[m.code == c].iloc[0]
         a = an.get(c, {})
-        return dict(code=c, creator=r.creator, views=int(r.views), reach=None if r.reach is None or pd.isna(r.reach) else round(float(r.reach), 1),
-                    age_h=round(r.age_h, 1), hook_text=a.get("hook_text"), summary=a.get("one_line_summary"),
-                    song=r.audio_title, location=a.get("location") or r.location_name,
-                    caption=(r.caption or "")[:160])
+        return dict(code=c, creator=clean(r.creator), views=int(r.views),
+                    reach=None if r.reach is None or pd.isna(r.reach) else round(float(r.reach), 1),
+                    age_h=round(r.age_h, 1), hook_text=clean(a.get("hook_text")), summary=clean(a.get("one_line_summary")),
+                    song=clean(r.audio_title), location=clean(a.get("location")) or clean(r.location_name),
+                    caption=(clean(r.caption) or "")[:160])
     return dict(
         group=group_title(conn, kind, key), kind=kind,
         key_numbers=dict(creators_with_rising_reels=stats["breadth"], rising_reels=stats["rising"],
