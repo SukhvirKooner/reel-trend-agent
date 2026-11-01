@@ -1,24 +1,50 @@
 # Reel Trend Agent
 
-Multi-niche Instagram Reels trend finder. **Street food (Delhi)**, **Concert reels (Diljit-focused)**, and **Fitness** each have their own Instagram account, browser profile, SQLite database, and category config under `config/niches.yaml`. A scout watches Reels and saves links and metadata. A checker re-opens the links to record view counts over time. A trend engine finds rising reels and the sub-genres, sounds and locations behind them. An explainer writes a "why it works" card with a playbook.
+**Team:** EVOKE  
+**Repository:** [SukhvirKooner/reel-trend-agent](https://github.com/SukhvirKooner/reel-trend-agent) (public)
+
+## Problem statement
+
+Short-form video trends on Instagram Reels move fast. Creators and marketers usually spot them late — by scrolling, copying what already went viral, or relying on gut feel. By then the format is saturated. There is no practical way to systematically watch a niche, measure which reels are *taking off* (not just popular accounts posting), and turn that into a clear “film this next” brief with evidence.
+
+## Solution / product
+
+**Reel Trend Agent** is a multi-niche Instagram Reels trend finder. For each niche it:
+
+1. **Scouts** Reels in a real browser (Playwright), quick-tags them with AI, and steers the feed toward in-niche content  
+2. **Checks** view and follower counts over time  
+3. **Detects rising reels** using reach, speed and momentum (not raw view count alone)  
+4. **Finds trends** shared by multiple rising creators (styles, sounds, locations)  
+5. **Explains** why a trend works and produces a short playbook creators can shoot tomorrow  
+
+Niches today: **Indian street food**, **Concert reels** (Diljit-focused), and **Fitness** — each with its own Instagram account, Chrome profile, SQLite database, and config under `config/niches.yaml`.
+
+A live dashboard shows overview, trends, agent decisions, reel analysis, and view tracking.
 
 ```
-app/scout.py     Process 1  Playwright scout: glance → quick tag → watch/skip → save link + frames
-app/analyzer.py  Process 2  Haiku quick tag (all reels) + Opus deep analysis (in-niche) + tag tidying
-app/checker.py   Process 3  re-opens links on an adaptive schedule, records views and follower counts (Apify backup)
-app/trends.py    Process 4  reach / speed / acceleration → rising → sub-genres → scores + labels
-app/explain.py   Process 5  winners-vs-rest lift table → Opus trend card (why + playbook)
-ui.py                       Streamlit: niche tree, trend card, agent live view, raw data
+app/scout.py     Scout: glance → quick tag → watch/skip → save link + frames
+app/analyzer.py  Haiku quick tag + Opus deep analysis + tag tidying
+app/checker.py   Re-check views / followers on an adaptive schedule
+app/trends.py    Reach / speed / acceleration → rising → sub-genres → scores
+app/explain.py   Winners-vs-rest lift → trend card (why + playbook)
+app/dashboard.py Live HTML dashboard
 ```
 
-## Phase 0: once, everyone together
-1. `source .venv/bin/activate`. Dependencies are already installed. For transcripts, also run `pip install faster-whisper` (ffmpeg is already on this Mac).
-2. `ANTHROPIC_API_KEY` is read from your shell environment. Copy `.env.example` to `.env` if you need to override any paths.
-3. **Accounts.** Set up 2 burner Instagram accounts on real phones and warm each one up for 15–20 minutes (plan section 2.1).
-4. **DevTools field check (plan section 2.4).** Confirm the field names Instagram uses right now, then edit `FIELD_VIEWS`, `FIELD_FOLLOWERS` and `parse_reel()` in `app/ig_parse.py`. To check quickly: log in, run `python -m app.scout --no-tag --minutes 2`, and look at `reels` and `snapshots` in `data/app.db`.
-5. Connect the scout laptop to the **Indian mobile hotspot**. Never run the scout from a datacenter IP.
+## Presentation
 
-## Niches (each niche is additive; street food stays default)
+PowerPoint / Google Slides: *[add link here]*
+
+## Team — EVOKE
+
+| Member | |
+|--------|--|
+| Sukhvir Singh | |
+| Mayank | |
+| Shivam Kaushik | |
+| Aruj Grag | |
+
+## Niches
+
 | Niche | Flag | Instagram profile | Database | Config |
 |-------|------|-------------------|----------|--------|
 | Street food (default) | `--niche street_food` | `profiles/scout` | `data/app.db` | `config/street_food.yaml` |
@@ -27,7 +53,15 @@ ui.py                       Streamlit: niche tree, trend card, agent live view, 
 
 First time on a niche: log into that niche’s Instagram account in its Chrome profile. Other niches’ logins and data stay untouched.
 
-## Run order. Start M1 as early as possible, because views over time need *time*.
+## Setup
+
+1. `source .venv/bin/activate` (or create a venv and `pip install -r requirements.txt`). For transcripts, also `pip install faster-whisper`.  
+2. Set `ANTHROPIC_API_KEY` (see `.env.example`).  
+3. Warm Instagram accounts on real phones before long scout runs.  
+4. Prefer an Indian mobile hotspot for the scout — avoid datacenter IPs.
+
+## Run
+
 ```bash
 # Street food (default)
 python -m app.scout --no-like --start-search
@@ -41,51 +75,30 @@ python -m app.scout --niche fitness --no-like --start-search
 python -m app.checker --niche fitness
 python -m app.analyzer --niche fitness
 python -m app.trends --niche fitness
-```
-- `python -m app.scout --no-tag` saves reels without calling Claude. The analyzer tags that backlog later.
-- If the scout stops with a challenge or "action blocked" page, do **not** solve it automatically.
-- At the end of the hackathon, run `python -m app.checker --once --final` to re-check reels older than 14 days one last time.
 
-## Dashboard (show this to mentors)
-```bash
-python -m app.dashboard          # → http://localhost:8080   (Street food · Concert · Fitness in the sidebar)
-python -m app.report --niche fitness
-```
-Left sidebar with five pages: **Overview** (plain-English headline: trend found or progress towards the first one,
-agent pulse of its last decisions, KPIs, pipeline funnel, latest decisions, fastest-growing reels, how it works) ·
-**Trends** (one card per trend: key numbers, why it works with confidence + evidence bars, a black "film this
-tomorrow" playbook with a Copy button, example reels) · **Agent activity** (decision feed with Watched/Skipped
-filter, branch coverage, decision mix, exploration events) · **Reel analysis** (searchable cards: hook with a
-position marker on the reel's timeline, story, measured edit + sound, drivers, view growth) · **View tracking**
-(search, status filters, sortable columns).
-
-Presenting: press **1–5** to switch pages, **?** for a plain-English "How to read this" guide, use the sidebar for
-light/dark and **Pause refresh**. The page refreshes in place every 30 s and keeps your page, filters, search text and
-open/closed cards. Times show as "x min ago" in your own time zone. Styles and behaviour live in `app/ui/dashboard.css`
-and `app/ui/dashboard.js`; the page works offline (no CDN, no fonts to download).
-
-## Demo safety net
-- To freeze the DB, pick a `backups/app-HHMM.db` file in the UI sidebar, or run `DB_PATH=./backups/app-HHMM.db streamlit run ui.py`.
-- Trend cards are stored in `trend_runs.card_json`, so the demo never waits on an API call.
-- Screen-record 2 minutes of the scout running.
-
-## Test the pipeline without Instagram (synthetic data)
-```bash
-python scripts/seed_demo.py                                  # writes data/demo.db; codes all start with DEMO
-DB_PATH=./data/demo.db python -m app.trends --once           # add --no-llm to skip Claude calls
-DB_PATH=./data/demo.db streamlit run ui.py
+# Dashboard
+python -m app.dashboard          # → http://localhost:8080
 ```
 
-## Small deviations from the plan
-- The branch `hygiene_and_exposé` is spelled `hygiene_and_expose` (ASCII only).
-- Tags are stored as `facet:tag`. Sub-genres must combine tags from **different** facets, so they describe a style rather than a pair of synonyms.
-- Hackathon thresholds are softened for mentor demos: rising = top 50% speed (not 25%), reach ≥ 1× followers, trend needs ≥ 2 rising creators, sub-genres need ≥ 3 reels / 2 creators and lift ≥ 1.2.
-- If a creator's follower count is still unknown, `reach` can't be computed. In that case a reel counts as rising only if its speed is in the top 25%.
-- Groups that are eligible but are not top-5, emerging or saturated get the label `active`.
-- Opus calls use server-side refusal fallbacks (`fallbacks: "default"`). A false-positive refusal on a reel is then retried on a fallback model instead of the reel being skipped.
+- `python -m app.scout --no-tag` saves reels without calling Claude; the analyzer tags the backlog later.  
+- If the scout hits a challenge or “action blocked” page, do **not** solve it automatically.  
+- Sync local DBs to a deployed host with `scripts/sync-to-digitalocean.sh` when using the cloud dashboard + analyzer setup.
+
+### Dashboard pages
+
+**Overview** · **Trends** (evidence + playbook) · **Agent activity** · **Reel analysis** · **View tracking**.  
+Shortcuts: **1–5** switch pages, **?** opens the guide, sidebar for light/dark and pause refresh. Live refresh every 30s.
+
+## Notes
+
+- Tags are stored as `facet:tag`. Sub-genres combine tags from **different** facets (a style, not synonyms).  
+- Rising uses speed percentile, reach vs followers, and creator breadth across niches.  
+- If follower count is unknown, reach cannot be computed; rising then requires a higher speed percentile.  
+- Opus calls use server-side refusal fallbacks so a false-positive refusal is retried instead of skipping the reel.
 
 ## Tests
+
 ```bash
-python -m pytest -q                         # unit tests: Claude, the browser and the clock are faked; no network needed
-RUN_LIVE=1 python -m pytest tests/test_live.py   # optional real-API smoke test (< $0.05): checks every schema and the Opus fallback config
+python -m pytest -q
+RUN_LIVE=1 python -m pytest tests/test_live.py   # optional real-API smoke test
 ```

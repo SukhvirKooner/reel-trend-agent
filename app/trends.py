@@ -242,8 +242,11 @@ def group_members(conn, m):
     loc = defaultdict(list)
     for r in m.itertuples():
         keys = set()
-        if r.location_name:
-            keys.add(r.location_name.strip())
+        name = r.location_name
+        if name is not None and not (isinstance(name, float) and pd.isna(name)):
+            name = str(name).strip()
+            if name and name.lower() != "nan":
+                keys.add(name)
         keys |= {t.split(":")[1] for t in r.tags if t.startswith("setting:")}
         for k in keys:
             loc[k].append(r.code)
