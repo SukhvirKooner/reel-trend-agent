@@ -1,0 +1,52 @@
+niche: fitness
+label: Fitness reels
+short_label: Fitness
+score_name: Fitness score
+creator_audience: fitness creators and coaches
+entity_facet: exercise
+region: IN
+description: >
+  Reels about workouts, training, mobility, transformations, form tips, gym and
+  home fitness content popular in India: hypertrophy, calisthenics, yoga, running,
+  fat-loss / muscle-gain journeys, meal prep for training, and motivational clips.
+  Focus is practical workout and technique content that coaches and creators post.
+relevance_threshold: 0.55
+
+branches:
+  - gym_hypertrophy          # gym lifts, push/pull/legs, machines, free weights
+  - home_bodyweight          # no-equipment / minimal-equipment home workouts
+  - yoga_and_mobility        # yoga flows, stretching, mobility routines
+  - running_and_cardio       # runs, HIIT, jump rope, cardio circuits
+  - transformation           # before/after fat loss or muscle gain journeys
+  - form_and_technique       # cues, corrections, "are you doing this wrong"
+  - diet_and_meal_prep       # high-protein meals, prep for training goals
+  - calisthenics             # pull-ups, handstands, street workout
+  - motivation_and_mindset   # hype edits, discipline talk, day-in-the-life
+  - sports_skill             # cricket / football / combat skill drills
+
+tag_facets:
+  exercise: [squat, deadlift, bench_press, pull_up, push_up, overhead_press, lunges,
+             planks, yoga_flow, stretching, hiit_circuit, running, jump_rope,
+             kettlebell, dumbbell_only, bodyweight, abs_core, cardio_machine, other]
+  format: [workout_demo, form_breakdown, transformation_edit, tip_list, pov_training,
+           day_in_life, challenge, comparison, asmr_gym, coach_cue, before_after]
+  hook: [are_you_doing_this_wrong, before_after_open, text_overlay_claim, countdown,
+         question_to_viewer, drop_into_set, transformation_reveal, sound_hook,
+         emotional_open, challenge_dare]
+  setting: [commercial_gym, home_floor, outdoor_park, rooftop, yoga_studio,
+            track_road, india_gym, hostel_room, hotel_gym, other]
+  audio: [trending_song, original_sound, coach_voiceover, voiceover_hindi,
+          voiceover_english, gym_noise, meme_sound]
+  emotion: [motivating, satisfying, educational, funny, intense, wholesome]
+
+exploration_keywords:
+  gym_hypertrophy: ["gym workout india", "push pull legs workout"]
+  home_bodyweight: ["home workout no equipment", "bodyweight workout india"]
+  yoga_and_mobility: ["yoga flow for beginners", "mobility stretch routine"]
+  running_and_cardio: ["hiit cardio workout", "running tips india"]
+  transformation: ["fitness transformation india", "fat loss transformation"]
+  form_and_technique: ["squat form tips", "are you doing this wrong gym"]
+  diet_and_meal_prep: ["high protein meal prep india", "gym diet indian"]
+  calisthenics: ["calisthenics india", "pull up progression"]
+  motivation_and_mindset: ["gym motivation reel", "discipline fitness"]
+  sports_skill: ["cricket fitness drill", "football agility training"]

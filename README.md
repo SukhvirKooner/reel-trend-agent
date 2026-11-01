@@ -1,6 +1,6 @@
 # Reel Trend Agent
 
-Multi-niche Instagram Reels trend finder. **Street food (Delhi)** and **Concert reels (Diljit-focused)** each have their own Instagram account, browser profile, SQLite database, and category config under `config/niches.yaml`. A scout watches Reels and saves links and metadata. A checker re-opens the links to record view counts over time. A trend engine finds rising reels and the sub-genres, sounds and locations behind them. An explainer writes a "why it works" card with a playbook.
+Multi-niche Instagram Reels trend finder. **Street food (Delhi)**, **Concert reels (Diljit-focused)**, and **Fitness** each have their own Instagram account, browser profile, SQLite database, and category config under `config/niches.yaml`. A scout watches Reels and saves links and metadata. A checker re-opens the links to record view counts over time. A trend engine finds rising reels and the sub-genres, sounds and locations behind them. An explainer writes a "why it works" card with a playbook.
 
 ```
 app/scout.py     Process 1  Playwright scout: glance → quick tag → watch/skip → save link + frames
@@ -18,13 +18,14 @@ ui.py                       Streamlit: niche tree, trend card, agent live view, 
 4. **DevTools field check (plan section 2.4).** Confirm the field names Instagram uses right now, then edit `FIELD_VIEWS`, `FIELD_FOLLOWERS` and `parse_reel()` in `app/ig_parse.py`. To check quickly: log in, run `python -m app.scout --no-tag --minutes 2`, and look at `reels` and `snapshots` in `data/app.db`.
 5. Connect the scout laptop to the **Indian mobile hotspot**. Never run the scout from a datacenter IP.
 
-## Niches (street food stays; concert is additive)
+## Niches (each niche is additive; street food stays default)
 | Niche | Flag | Instagram profile | Database | Config |
 |-------|------|-------------------|----------|--------|
 | Street food (default) | `--niche street_food` | `profiles/scout` | `data/app.db` | `config/street_food.yaml` |
 | Concert (Diljit focus) | `--niche concert` | `profiles/concert` | `data/concert.db` | `config/concert.yaml` |
+| Fitness | `--niche fitness` | `profiles/fitness` | `data/fitness.db` | `config/fitness.yaml` |
 
-First time on concert: log into the **new** Instagram account in the Chrome window that opens for `profiles/concert`. Street-food login and data are untouched.
+First time on a niche: log into that niche’s Instagram account in its Chrome profile. Other niches’ logins and data stay untouched.
 
 ## Run order. Start M1 as early as possible, because views over time need *time*.
 ```bash
@@ -34,11 +35,12 @@ python -m app.checker
 python -m app.analyzer
 python -m app.trends
 
-# Concert (separate account + DB)
+# Concert / Fitness (separate account + DB each)
 python -m app.scout --niche concert --no-like --start-search
-python -m app.checker --niche concert
-python -m app.analyzer --niche concert
-python -m app.trends --niche concert
+python -m app.scout --niche fitness --no-like --start-search
+python -m app.checker --niche fitness
+python -m app.analyzer --niche fitness
+python -m app.trends --niche fitness
 ```
 - `python -m app.scout --no-tag` saves reels without calling Claude. The analyzer tags that backlog later.
 - If the scout stops with a challenge or "action blocked" page, do **not** solve it automatically.
@@ -46,8 +48,8 @@ python -m app.trends --niche concert
 
 ## Dashboard (show this to mentors)
 ```bash
-python -m app.dashboard          # → http://localhost:8080   (Street food · Concert · Demo · frozen backups in the sidebar)
-python -m app.report --niche concert
+python -m app.dashboard          # → http://localhost:8080   (Street food · Concert · Fitness in the sidebar)
+python -m app.report --niche fitness
 ```
 Left sidebar with five pages: **Overview** (plain-English headline: trend found or progress towards the first one,
 agent pulse of its last decisions, KPIs, pipeline funnel, latest decisions, fastest-growing reels, how it works) ·

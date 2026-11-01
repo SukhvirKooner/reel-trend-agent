@@ -1,7 +1,7 @@
 """Live dashboard with zero extra dependencies — the evidence report, rebuilt from the database on every
 request; the page refreshes its content in place every 30 s (keeps your tab and scroll position).
 
-    python -m app.dashboard                  # http://localhost:8080   (?db=street_food | ?db=concert)
+    python -m app.dashboard                  # http://localhost:8080   (?db=street_food | ?db=concert | ?db=fitness)
     python -m app.dashboard --port 8090
 """
 import argparse

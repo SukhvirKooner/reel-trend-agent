@@ -151,7 +151,7 @@ def apply_rising(m):
 # ======================================================================= 8.3 sub-genre discovery
 def _style_tags(tags):
     # entity facets (dish / artist) describe *what*, not the style combo
-    return sorted({t for t in tags if not t.startswith(("dish:", "artist:"))})
+    return sorted({t for t in tags if not t.startswith(("dish:", "artist:", "exercise:"))})
 
 
 def discover_subgenres(conn, m, use_llm=True):

@@ -18,3 +18,11 @@ niches:
     scout_profile: ./profiles/concert
     checker_profile: ./profiles/concert_checker
     account: scout_concert
+
+  fitness:
+    label: Fitness reels
+    config: ./config/fitness.yaml
+    db: ./data/fitness.db
+    scout_profile: ./profiles/fitness
+    checker_profile: ./profiles/fitness_checker
+    account: scout_fitness
