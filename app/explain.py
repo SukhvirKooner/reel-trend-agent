@@ -16,7 +16,7 @@ from app import db, llm, settings, trends
 from app.schemas import TrendCard
 
 log = logging.getLogger("explain")
-MIN_LIFT, MIN_WINNERS, FLOOR = 1.5, 3, 0.05
+MIN_LIFT, MIN_WINNERS, FLOOR = 1.2, 2, 0.05
 RESCORE = 0.25      # regenerate a card when the score moved by more than 25%
 
 _EMOJI = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]")
@@ -196,7 +196,9 @@ def run(force=False, labels=("emerging", "trending")):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--all-labels", action="store_true", help="also explain active/saturated groups")
     a = ap.parse_args()
+    settings.apply_niche(a.niche)
     run(a.force, ("emerging", "trending", "active", "saturated") if a.all_labels else ("emerging", "trending"))

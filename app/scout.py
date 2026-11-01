@@ -17,6 +17,7 @@ import shutil
 import sys
 import time
 from collections import Counter, deque
+from pathlib import Path
 from urllib.parse import quote
 
 from PIL import Image
@@ -31,6 +32,11 @@ DRIFT_WINDOW, DRIFT_MIN_SHARE = 30, 0.40
 EARLY_DRIFT = 10            # 10 off-niche reels in a row → nudge right away
 LIKE_EVERY = (8, 10)
 LIKES_PER_HOUR = 40
+
+
+def goto_ig(page, url, timeout=60_000):
+    """Instagram often never fires a full 'load' event — wait for DOM instead."""
+    return page.goto(url, wait_until="domcontentloaded", timeout=timeout)
 
 ACTIVE_VIDEO_JS = """
 () => {
@@ -335,7 +341,7 @@ class Scout:
         kw = random.choice(kws)
         self.log(None, "search_nudge", branch, reason=f"{why}: '{kw}'")
         self.last_nudge_n = self.n_reels
-        self.page.goto(f"https://www.instagram.com/explore/search/keyword/?q={quote(kw)}")
+        goto_ig(self.page, f"https://www.instagram.com/explore/search/keyword/?q={quote(kw)}")
         self.human_sleep(3, 5)
         self.check_blocked()
         links = self.page.eval_on_selector_all(
@@ -351,7 +357,7 @@ class Scout:
             f"SELECT code FROM reels WHERE code IN ({','.join('?' * len(pool))})", pool)} if pool else set()
         pool = [c for c in pool if c not in seen] + [c for c in pool if c in seen]   # unseen first
         for code in pool[:random.randint(3, 5)]:
-            self.page.goto(f"https://www.instagram.com/reel/{code}/")
+            goto_ig(self.page, f"https://www.instagram.com/reel/{code}/")
             self.human_sleep(1.5, 2.5)
             self.check_blocked()
             try:
@@ -360,7 +366,7 @@ class Scout:
                 raise
             except Exception as e:
                 log.warning("nudge reel failed: %s", e)
-        self.page.goto("https://www.instagram.com/reels/")
+        goto_ig(self.page, "https://www.instagram.com/reels/")
         self.human_sleep(3, 5)
 
     def exploration_step(self):
@@ -421,7 +427,7 @@ def print_reel_block(n, code, meta, qt, in_niche, action, reason, dwell, n_frame
     if qt is not None:
         tags = ", ".join(f"{t.facet}:{t.tag}" for t in qt.tags)
         verdict = "IN NICHE" if in_niche else "not in niche"
-        lines.append(f"   AI tag  : {verdict} · street-food score {qt.niche_score:.2f} · food {qt.food_related:.2f}"
+        lines.append(f"   AI tag  : {verdict} · {settings.score_name().lower()} {qt.niche_score:.2f} · related {qt.food_related:.2f}"
                      f" · branch {qt.branch or '-'} · lang {qt.language}")
         lines.append(f"   detected: {tags}")
     icon = {"skip": "⏭  SKIP", "watch_half": "◐  WATCH HALF", "watch": "👀 WATCH", "watch_full": "👀 WATCH FULL",
@@ -445,7 +451,7 @@ def wait_for_login(ctx, page, timeout_s=1200):
         return True
     print("\n>>> Please log in to Instagram in the NEW Chrome window this tool opened (waiting up to 20 min)…", flush=True)
     try:
-        page.goto("https://www.instagram.com/accounts/login/")
+        goto_ig(page, "https://www.instagram.com/accounts/login/")
         page.bring_to_front()
     except Exception:
         pass
@@ -459,11 +465,11 @@ def wait_for_login(ctx, page, timeout_s=1200):
         if page.is_closed():              # tab closed but browser alive → open a fresh login tab
             page = ctx.new_page()
             page.on("response", ig_parse.on_response)
-            page.goto("https://www.instagram.com/accounts/login/")
+            goto_ig(page, "https://www.instagram.com/accounts/login/")
         if state:
             print(">>> Logged in. Opening Reels.", flush=True)
             time.sleep(3)
-            page.goto("https://www.instagram.com/reels/")
+            goto_ig(page, "https://www.instagram.com/reels/")
             time.sleep(5)
             return True
     return False
@@ -471,16 +477,21 @@ def wait_for_login(ctx, page, timeout_s=1200):
 
 def main():
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--no-tag", action="store_true", help="save reels without live quick-tagging")
     ap.add_argument("--minutes", type=float, default=random.uniform(45, 60), help="session length")
     ap.add_argument("--sessions", type=int, default=99, help="sessions (10 min break between)")
-    ap.add_argument("--account", default=settings.SCOUT_ACCOUNT)
-    ap.add_argument("--profile", default=str(settings.SCOUT_PROFILE_DIR))
+    ap.add_argument("--account", default=None, help="override Instagram account label in logs")
+    ap.add_argument("--profile", default=None, help="override Chrome profile dir (defaults to the niche's)")
     ap.add_argument("--no-like", action="store_true", help="never like (use on a personal account)")
     ap.add_argument("--max-reels", type=int, default=None, help="stop after N reels (bounded demo run)")
     ap.add_argument("--start-search", action="store_true",
-                    help="begin with a search nudge (use when the account's feed isn't street food yet)")
+                    help="begin with a search nudge (use when the account's feed isn't warmed to the niche yet)")
     args = ap.parse_args()
+    settings.apply_niche(args.niche)
+    profile = args.profile or str(settings.SCOUT_PROFILE_DIR)
+    account = args.account or settings.SCOUT_ACCOUNT
+    Path(profile).mkdir(parents=True, exist_ok=True)
 
     from playwright.sync_api import sync_playwright
 
@@ -489,24 +500,24 @@ def main():
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             channel=settings.BROWSER_CHANNEL or None,
-            user_data_dir=args.profile, headless=False,
+            user_data_dir=profile, headless=False,
             viewport={"width": 1280, "height": 900},
             locale="en-IN", timezone_id="Asia/Kolkata",
             geolocation={"latitude": 28.6139, "longitude": 77.2090}, permissions=["geolocation"],
         )
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.on("response", ig_parse.on_response)
-        page.goto("https://www.instagram.com/reels/")
+        goto_ig(page, "https://www.instagram.com/reels/")
         time.sleep(4)
         if not wait_for_login(ctx, page):
             print("!!! Not logged in — exiting.", file=sys.stderr)
             sys.exit(3)
         page = ctx.pages[-1] if ctx.pages else ctx.new_page()
         page.mouse.click(640, 450)   # focus the feed so ArrowDown works; also unmutes on some builds
-        scout = Scout(page, conn, args.account, use_tag=not args.no_tag, allow_likes=not args.no_like,
+        scout = Scout(page, conn, account, use_tag=not args.no_tag, allow_likes=not args.no_like,
                       max_reels=args.max_reels)
-        print(f">>> Scout running (likes {'OFF' if args.no_like else 'ON'}, max reels {args.max_reels or '∞'}). "
-              f"Ctrl+C to stop.", flush=True)
+        print(f">>> Scout [{settings.ACTIVE_NICHE}] running (likes {'OFF' if args.no_like else 'ON'}, "
+              f"max reels {args.max_reels or '∞'}, profile {profile}). Ctrl+C to stop.", flush=True)
         try:
             if args.start_search:
                 weakest = min(scout.branch_counts, key=lambda b: scout.branch_counts[b])
@@ -517,7 +528,7 @@ def main():
                     break
                 scout.log(None, "break", reason="session limit → 10 min break")
                 time.sleep(600)
-                page.goto("https://www.instagram.com/reels/")
+                goto_ig(page, "https://www.instagram.com/reels/")
                 time.sleep(4)
         except BlockedError as e:
             scout.log(None, "STOPPED", reason=str(e))

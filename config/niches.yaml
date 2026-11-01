@@ -1,0 +1,20 @@
+# Registry of niches. Each niche has its own Instagram account (browser profile),
+# SQLite database, and category config. Street food stays the default.
+default: street_food
+
+niches:
+  street_food:
+    label: Indian street food
+    config: ./config/street_food.yaml
+    db: ./data/app.db
+    scout_profile: ./profiles/scout
+    checker_profile: ./profiles/checker
+    account: scout1
+
+  concert:
+    label: Concert reels
+    config: ./config/concert.yaml
+    db: ./data/concert.db
+    scout_profile: ./profiles/concert
+    checker_profile: ./profiles/concert_checker
+    account: scout_concert

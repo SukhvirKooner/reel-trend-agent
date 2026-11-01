@@ -1,0 +1,53 @@
+niche: concert
+label: Concert reels
+short_label: Concert
+score_name: Concert score
+creator_audience: concert creators and fan editors
+entity_facet: artist
+region: IN
+description: >
+  Reels from live concerts, tours and music festivals in India (and diaspora shows):
+  on-stage performances, fan cams, crowd moments, setlist clips, outfits, entries/exits,
+  backstage, and tour vlogs. Focus is Diljit Dosanjh Dil-Luminati / arena shows; other
+  artists are kept as lighter side branches so the feed can still explore.
+relevance_threshold: 0.55        # a bit softer than street food for the mentor demo
+
+branches:                       # level-1 branches (fixed) — Diljit-heavy
+  - diljit_stage_performance    # Diljit singing / dancing on stage
+  - diljit_fan_cam              # phone fan cams of Diljit from the crowd
+  - diljit_entry_exit           # stage entry, exit, helicopter, grand openers
+  - diljit_outfit_look          # outfits, jewellery, turban / fashion moments
+  - diljit_song_moment          # one hit song clip (Lover, Ambarsariya, Born to Shine…)
+  - diljit_crowd_energy         # crowd chant, wave, sing-along, mosh
+  - diljit_tour_vlog            # travel, venue arrival, city, behind the tour
+  - other_punjabi_live          # AP Dhillon, Sidhu tributes, Karan Aujla, etc.
+  - bollywood_live              # Bollywood concert / award-show stage clips
+  - festival_and_arena          # multi-artist fests, stadium production / lights
+
+tag_facets:
+  artist: [diljit_dosanjh, ap_dhillon, karan_aujla, sidhu_moose_wala, shubh,
+           guru_randhawa, badshah, arijit_singh, diljit_collab, other_punjabi,
+           bollywood_artist, international_guest]
+  format: [stage_wide, stage_closeup, fan_cam, crowd_shot, pov_crowd, drone_aerial,
+           slow_mo_edit, multi_cam_cut, lyric_overlay, outfit_showcase, tour_vlog,
+           backstage_clip, entry_exit_clip, comparison]
+  hook: [drop_into_chorus, crowd_scream_open, outfit_reveal, text_overlay_claim,
+         song_title_card, countdown, emotional_open, question_to_viewer, sound_hook,
+         before_after, celebrity_cameo]
+  setting: [dil_luminati_tour, indoor_arena, outdoor_stadium, festival_ground,
+            delhi_ncr, mumbai, punjab, canada_show, uk_show, us_show, other_city]
+  audio: [live_vocals, live_band, crowd_noise, trending_song, original_sound,
+          voiceover_punjabi, voiceover_hindi, voiceover_english, meme_sound]
+  emotion: [hype, emotional, wholesome, nostalgic, funny, awe]
+
+exploration_keywords:           # scout search nudges — Diljit first
+  diljit_stage_performance: ["diljit dosanjh live concert", "diljit stage performance"]
+  diljit_fan_cam: ["diljit fan cam concert", "diljit dil-luminati fan cam"]
+  diljit_entry_exit: ["diljit concert entry", "diljit stage entry"]
+  diljit_outfit_look: ["diljit concert outfit", "diljit look dil-luminati"]
+  diljit_song_moment: ["diljit lover live", "diljit born to shine live"]
+  diljit_crowd_energy: ["diljit crowd singing", "diljit concert crowd"]
+  diljit_tour_vlog: ["diljit tour vlog", "dil-luminati tour"]
+  other_punjabi_live: ["punjabi concert live", "ap dhillon live"]
+  bollywood_live: ["bollywood concert stage", "arijit singh live concert"]
+  festival_and_arena: ["india music festival concert", "stadium concert india"]

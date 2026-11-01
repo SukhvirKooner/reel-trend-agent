@@ -383,7 +383,9 @@ def run(once=False, workers=4):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()
+    settings.apply_niche(a.niche)
     run(a.once, a.workers)

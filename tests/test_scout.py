@@ -329,7 +329,7 @@ def test_printed_frame_count_is_before_deletion(env, capsys):
     sc.handle_reel()
     out = capsys.readouterr().out
     assert "3 frames captured → frames deleted" in out
-    assert "SKIP" in out and "street-food score 0.00" in out
+    assert "SKIP" in out and "street-food score 0.00" in out  # default niche is street_food
 
 
 def test_early_drift_guard(env, monkeypatch):

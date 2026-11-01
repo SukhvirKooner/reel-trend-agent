@@ -41,10 +41,9 @@ TIPS = {
              "so it is travelling beyond the creator's own audience.",
     "speed": "New views per hour between the last two checks. Higher means Instagram is pushing the reel right now.",
     "momentum": "Is the speed still going up? 'Speeding up' means views are arriving faster than before; 'slowing' means it is fading.",
-    "creators": "How many different creators have a rising reel in this group. Three or more is what turns one viral post into a trend.",
+    "creators": "How many different creators have a rising reel in this group. Two or more is what turns one viral post into a trend.",
     "strength": "Trend score compared with the strongest trend on this page: more creators, more rising reels, faster and fresher = stronger.",
     "age": "Median age of the rising reels in this group. Young groups are early; old groups are saturated.",
-    "score": "Street-food score from the AI quick look (0–100). 60 or more counts as street food.",
 }
 ICONS = {
     "home": "<path d='M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z'/>",
@@ -196,13 +195,13 @@ def ring(frac, size, big, small):
             f"transform='rotate(-90 {size / 2} {size / 2})'/></svg><div class='rg-t'><b>{big}</b><span>{small}</span></div></div>")
 
 
-def mring(v, on=True, size=38):
+def mring(v, on=True, size=38, score_label="niche score"):
     if v is None or pd.isna(v):
         return f"<div class='mring none' style='width:{size}px;height:{size}px' title='no score'>–</div>"
     v = max(0.0, min(1.0, float(v)))
     r = size / 2 - 3
     c = 2 * math.pi * r
-    return (f"<div class='mring {'on' if on else ''}' style='width:{size}px;height:{size}px' title='street-food score {v:.2f}'>"
+    return (f"<div class='mring {'on' if on else ''}' style='width:{size}px;height:{size}px' title='{E(score_label)} {v:.2f}'>"
             f"<svg viewBox='0 0 {size} {size}'><circle class='rg-bg' cx='{size / 2}' cy='{size / 2}' r='{r:.1f}'/>"
             f"<circle class='rg-fg' cx='{size / 2}' cy='{size / 2}' r='{r:.1f}' stroke-dasharray='{c * v:.1f} {c:.1f}' "
             f"transform='rotate(-90 {size / 2} {size / 2})'/></svg><b>{round(v * 100)}</b></div>")
@@ -225,25 +224,31 @@ def playbook_text(title, pb):
     return "\n".join(L)
 
 
-GUIDE = [
-    ("Street-food score", "A quick AI look at each reel's first frames, from 0 to 100. 60 or more counts as Indian street food; "
-                          "anything lower is skipped fast so the agent does not waste time or train the feed on other content."),
-    ("Branch and tags", "Street food is split into 10 branches (chaat, momos, paratha, sweets…). Each reel also gets tags "
-                        "for its dish, format, hook, place, sound and emotion."),
-    ("Taking off (rising)", "A reel is rising when its views per hour (adjusted for follower count) are in the top 25% of everything "
-                            "tracked, it reaches at least twice its followers, it is not slowing down, and its likes look genuine."),
-    ("Views vs followers (reach)", "Views divided by followers. It lets a small vendor's 50K views count for more than a "
-                                   "huge account's 50K."),
-    ("Speed and momentum", "Speed is new views per hour between the last two checks. Momentum says whether that speed is rising or falling."),
-    ("Trend", "A trend is a pattern shared by at least 3 different creators whose recent reels are rising: a style "
-              "(a mix of hook + format + place…), a sound, or a location. One viral post is not a trend."),
-    ("Why it's working", "The AI compares rising reels with the rest and lists the features that are far more common in the winners "
-                         "(the evidence bars show both percentages and the multiple)."),
-    ("Watch + replay", "When the agent finds street food on a branch it has barely seen, it watches twice. That tells Instagram "
-                       "to show more of it, which is how the agent steers its own feed."),
-    ("Resurfacing", "An old reel (over 14 days) that is suddenly growing again. Interesting, but not counted as a new trend."),
-    ("Shortcuts", "Press 1–5 to jump between pages, ? for this guide, Esc to close it."),
-]
+def guide_for(cfg):
+    label = settings.niche_label(cfg)
+    short = settings.niche_short(cfg)
+    score = settings.score_name(cfg)
+    entity = cfg.get("entity_facet", "dish")
+    thr = int(round(float(cfg.get("relevance_threshold", 0.6)) * 100))
+    return [
+        (score, f"A quick AI look at each reel's first frames, from 0 to 100. {thr} or more counts as {label}; "
+                "anything lower is skipped fast so the agent does not waste time or train the feed on other content."),
+        ("Branch and tags", f"{label} is split into fixed branches. Each reel also gets tags for its {entity}, "
+                            "format, hook, place, sound and emotion."),
+        ("Taking off (rising)", "A reel is rising when its views per hour (adjusted for follower count) are in the top half of everything "
+                                "tracked, it reaches at least its follower count in views, it is not slowing down, and its likes look genuine."),
+        ("Views vs followers (reach)", "Views divided by followers. It lets a small creator's 50K views count for more than a "
+                                       "huge account's 50K."),
+        ("Speed and momentum", "Speed is new views per hour between the last two checks. Momentum says whether that speed is rising or falling."),
+        ("Trend", "A trend is a pattern shared by at least 2 different creators whose recent reels are rising: a style "
+                  "(a mix of hook + format + place…), a sound, or a location. One viral post is not a trend."),
+        ("Why it's working", "The AI compares rising reels with the rest and lists the features that are far more common in the winners "
+                             "(the evidence bars show both percentages and the multiple)."),
+        ("Watch + replay", f"When the agent finds {short.lower()} content on a branch it has barely seen, it watches twice. That tells Instagram "
+                           "to show more of it, which is how the agent steers its own feed."),
+        ("Resurfacing", "An old reel (over 14 days) that is suddenly growing again. Interesting, but not counted as a new trend."),
+        ("Shortcuts", "Press 1–5 to jump between pages, ? for this guide, Esc to close it."),
+    ]
 
 
 def clean_df(df):
@@ -257,7 +262,15 @@ def clean_df(df):
 
 
 # ------------------------------------------------------------------ page
-def build(conn, db_label, live=False, sources=None, current=None):
+def build(conn, db_label, live=False, sources=None, current=None, niche_cfg=None, db_path=None):
+    cfg = niche_cfg or (settings.niche_for_db(db_path)[1] if db_path else settings.niche())
+    n_label = settings.niche_label(cfg)
+    n_short = settings.niche_short(cfg)
+    n_score = settings.score_name(cfg)
+    region = cfg.get("region") or ""
+    brand_sub = f"{n_label}" + (f" · {region}" if region else "")
+    need_creators = trends.MIN_BREADTH
+
     q = lambda sql, *a: clean_df(pd.read_sql_query(sql, conn, params=a))  # noqa: E731
     m = trends.reel_metrics(conn)
     if not m.empty:
@@ -296,9 +309,10 @@ def build(conn, db_label, live=False, sources=None, current=None):
     recent = int((m.age_h <= 14 * 24).sum()) if not m.empty else 0
     multi = int((m.n_snaps >= 2).sum()) if not m.empty else 0
     best = int(tr.breadth.max()) if not tr.empty else 0
-    prog = [("Recent street-food reels (≤ 14 days old)", recent, 20),
+    prog = [(f"Recent {n_short.lower()} reels (≤ 14 days old)", recent, 20),
             ("Reels checked at least twice (so speed can be measured)", multi, 20),
-            ("Rising reels", n_rising, 6), ("Creators rising in one group (need 3)", best, 3)]
+            ("Rising reels", n_rising, 6),
+            (f"Creators rising in one group (need {need_creators})", best, need_creators)]
     prog_frac = sum(min(v / g, 1) for _, v, g in prog) / len(prog)
     n_trends = len(live_tr)
 
@@ -317,7 +331,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
             "<rect x='17' y='2' width='2' height='16' rx='1'/></svg>")
     now = datetime.now()
     side = (f"<aside class='side'><div class='brand'><div class='mark'>{mark}</div><div><b>Reel Trends</b>"
-            f"<span>Indian street food · Delhi</span></div></div>"
+            f"<span>{E(brand_sub)}</span></div></div>"
             f"<nav id='tabs'>{nav}</nav>{src}"
             f"<div class='side-foot'>"
             f"<div class='live {'on' if live else ''}'><i></i><span id='live-txt'>{'Live' if live else 'Snapshot'} · {now:%H:%M:%S}</span></div>"
@@ -357,8 +371,8 @@ def build(conn, db_label, live=False, sources=None, current=None):
     else:
         eyebrow = f"{ico('search', 14)} Collecting evidence"
         h1 = "No trend yet. The agent is still learning the niche."
-        sub = (f"It has scanned <b class='ink'>{int(k.seen)}</b> reels, kept <b class='ink'>{int(k.niche)}</b> as street food and is "
-               f"tracking views on <b class='ink'>{len(m)}</b>. A trend appears when at least 3 different creators have rising "
+        sub = (f"It has scanned <b class='ink'>{int(k.seen)}</b> reels, kept <b class='ink'>{int(k.niche)}</b> as {E(n_short.lower())} and is "
+               f"tracking views on <b class='ink'>{len(m)}</b>. A trend appears when at least {need_creators} different creators have rising "
                "reels in the same style, sound or place.")
         hero_ring = ring(prog_frac, 132, f"{prog_frac * 100:.0f}%", "to first trend")
         cta = ("<div class='cta'><a class='btn primary' href='#agent' data-tab='agent'>See what it is doing "
@@ -378,7 +392,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
              "<span><i style='background:var(--s1)'></i>watched fully</span><span><i style='background:var(--s1-deep)'></i>watched + replayed</span></div></div>")
 
     tiles = [("eye", "Reels scanned", nf(k.seen), f"{int(k.seen - k.niche)} skipped as off-niche", False),
-             ("pin", "Street-food reels", nf(k.niche), f"{hit:.0f}% of scanned", False),
+             ("pin", f"{n_short} reels", nf(k.niche), f"{hit:.0f}% of scanned", False),
              ("cpu", "Deep-analysed by AI", nf(k.analyzed), "hook · edit · sound · drivers", False),
              ("users", "Creators tracked", nf(k.creators), "follower counts from profiles", False),
              ("refresh", "View re-checks", nf(k.checks), "views measured over time", False),
@@ -387,7 +401,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
         f"<div class='kpi {'hot' if hot else ''}'><div class='kpi-i'>{ico(i, 17)}</div><div class='kpi-l'>{a}</div>"
         f"<div class='kpi-v'>{b}</div><div class='muted sm'>{c}</div></div>" for i, a, b, c, hot in tiles) + "</div>")
 
-    stages = [("Scanned in feed", int(k.seen)), ("Street food", int(k.niche)), ("Views tracked", len(m)),
+    stages = [("Scanned in feed", int(k.seen)), (n_short, int(k.niche)), ("Views tracked", len(m)),
               ("Taking off", n_rising), ("Part of a trend", len(in_trend))]
     recent_dec = q(f"""SELECT l.at, l.code, l.action, l.reason, r.creator, q.niche_score
                        FROM agent_log l LEFT JOIN reels r USING(code) LEFT JOIN quick_tags q USING(code)
@@ -419,7 +433,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
                  f"</div><div style='margin-top:6px'>{''.join(rows)}</div>"
                  "<div style='margin-top:10px'><a href='#tracking' data-tab='tracking' class='sm'>See all tracked reels →</a></div></div>")
 
-    steps = [("Scout", "scrolls Reels like a person; skips off-niche fast, watches street food fully", f"{int(k.seen)} reels"),
+    steps = [("Scout", f"scrolls Reels like a person; skips off-niche fast, watches {n_short.lower()} fully", f"{int(k.seen)} reels"),
              ("Analyzer", "Claude tags every reel; Opus breaks down hook, story, edit, sound and drivers", f"{int(k.analyzed)} analysed"),
              ("Checker", "re-opens saved links on a schedule and records views and followers", f"{int(k.checks)} checks"),
              ("Trend engine", "speed, reach and momentum → rising reels → shared styles, sounds, places", f"{n_trends} trends"),
@@ -438,7 +452,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
          "<p>Styles, sounds and places that several creators are riding right now, why they work, and what to film.</p></div>"]
     if live_tr.empty:
         T.append("<div class='card empty'><h3>No trend yet — still collecting evidence</h3>"
-                 "<p class='muted' style='margin-top:6px;max-width:720px'>A trend needs <b class='ink'>at least 3 different creators</b> "
+                 f"<p class='muted' style='margin-top:6px;max-width:720px'>A trend needs <b class='ink'>at least {need_creators} different creators</b> "
                  "whose recent reels are rising in the same style, sound or location. Keep the scout and checker running. "
                  "Progress towards the first trend:</p><div class='empty-grid'>" + "".join(
                      f"<div class='pg'><div class='pg-l'><span>{a}</span><span><b>{v}</b> / {g}</span></div>"
@@ -515,12 +529,13 @@ def build(conn, db_label, live=False, sources=None, current=None):
     A = ["<section id='agent' class='tab'><div class='ph'><h1>Agent activity</h1>"
          "<p>Every reel the agent looked at: what it saw, what the AI detected, what it decided and why.</p></div>"
          "<div class='grid-a'><div class='card'><div class='toolbar' style='margin:0'><div><h3>Decision feed</h3>"
-         "<div class='sub'>newest first · the number in the circle is the street-food score</div></div>"
+         f"<div class='sub'>newest first · the number in the circle is the {E(n_score.lower())}</div></div>"
          "<div class='chipbar'>"
          f"<button class='fc on' data-fchip='feed' data-val='all'>All<b>{len(dec)}</b></button>"
          f"<button class='fc' data-fchip='feed' data-val='watched'>Watched<b>{n_watch}</b></button>"
          f"<button class='fc' data-fchip='feed' data-val='skipped'>Skipped<b>{n_skip}</b></button></div></div>"
          "<div class='feed' data-list>"]
+    thr = float(cfg.get("relevance_threshold", 0.6))
     for r in dec.itertuples():
         ic, lab, cls = PILL.get(r.action, ("•", r.action, "p-mute"))
         kind = "skipped" if r.action in ("skip", "skip_ad") else "watched"
@@ -529,7 +544,8 @@ def build(conn, db_label, live=False, sources=None, current=None):
         extra = f"{aud}{' · 📍 ' + E(r.location_name) if r.location_name else ''}{' · ♻️ repost' if r.repost_of else ''}"
         dwell = "" if pd.isna(r.dwell_s) else f"{r.dwell_s:.0f}s watched"
         extra_html = f"<span class='muted sm'>{extra}</span>" if extra else ""
-        A.append(f"<div class='fi {'dim' if cls == 'p-mute' else ''}' data-item data-k='{kind}'><div>{mring(sc, (sc or 0) >= 0.6)}</div><div>"
+        A.append(f"<div class='fi {'dim' if cls == 'p-mute' else ''}' data-item data-k='{kind}'>"
+                 f"<div>{mring(sc, (sc or 0) >= thr, score_label=n_score)}</div><div>"
                  f"<div class='fi-h'><span class='pill {cls}'>{ic} {lab}</span>{link(r.code, '@' + (r.creator or '?'))}"
                  f"{'<span class=muted>· ' + E(human(r.branch)) + '</span>' if r.branch else ''}</div>"
                  f"<div class='fi-c'>{E((r.caption or '')[:140])}</div>"
@@ -540,9 +556,10 @@ def build(conn, db_label, live=False, sources=None, current=None):
                          "<div class='muted' style='padding:18px 0'>No decisions yet.</div>") + "</div><div>")
     cov = q("SELECT q.branch, COUNT(*) n FROM quick_tags q JOIN reels r USING(code) WHERE r.in_niche=1 GROUP BY q.branch")
     cmap = dict(zip(cov.branch, cov.n))
-    brows = sorted([(b.replace("_", " "), int(cmap.get(b, 0))) for b in settings.branches()], key=lambda x: -x[1])
+    brows = sorted([(b.replace("_", " "), int(cmap.get(b, 0))) for b in cfg.get("branches", settings.branches())],
+                   key=lambda x: -x[1])
     avg = sum(v for _, v in brows) / max(len(brows), 1)
-    A.append(f"<div class='card'><h3>Branch coverage</h3><div class='sub'>street-food reels found per branch. The dashed line is the "
+    A.append(f"<div class='card'><h3>Branch coverage</h3><div class='sub'>{E(n_short.lower())} reels found per branch. The dashed line is the "
              f"average ({avg:.1f}). Branches below it get a full watch + replay and search nudges.</div>{hbars(brows, avg=avg)}</div>")
     mix = q(f"SELECT action, COUNT(*) n FROM agent_log WHERE action IN ({','.join('?' * len(DECISIONS))}) GROUP BY action", *DECISIONS)
     mixrows = sorted(zip(mix.action, mix.n), key=lambda x: -x[1])
@@ -566,7 +583,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
     # ============================== ANALYSIS
     an = q("""SELECT a.*, r.creator, r.audio_title, r.duration_s, q.branch FROM analysis a JOIN reels r USING(code)
               LEFT JOIN quick_tags q USING(code) ORDER BY a.analyzed_at DESC LIMIT 150""")
-    N = [f"<section id='analysis' class='tab'><div class='ph'><h1>Reel analysis</h1><p>What Claude found inside each street-food reel. "
+    N = [f"<section id='analysis' class='tab'><div class='ph'><h1>Reel analysis</h1><p>What Claude found inside each {E(n_short.lower())} reel. "
          "Cut rate and sound are <b class='ink'>measured</b> from the frames and audio, not guessed.</p></div>"
          "<div class='toolbar'><label class='search'>" + ico("search", 16) +
          "<input data-q='aq' placeholder='Search creator, hook, dish, place…' autocomplete='off'></label>"
@@ -618,7 +635,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
 
     # ============================== TRACKING
     n_res = int(m.resurfacing.sum()) if not m.empty else 0
-    R = ["<section id='tracking' class='tab'><div class='ph'><h1>View tracking</h1><p>Every street-food reel with measured views. "
+    R = [f"<section id='tracking' class='tab'><div class='ph'><h1>View tracking</h1><p>Every {E(n_short.lower())} reel with measured views. "
          "Click a column to sort.</p></div><div class='card'>"]
     if m.empty:
         R.append("<div class='muted pad'>No view counts yet. The checker fills these in.</div>")
@@ -657,7 +674,7 @@ def build(conn, db_label, live=False, sources=None, current=None):
     guide = ("<div class='scrim' data-guide></div><aside class='guide' aria-label='How to read this dashboard'>"
              f"<button class='x' data-guide aria-label='Close'>{ico('x', 16)}</button><h2>How to read this</h2>"
              "<p class='muted'>Plain-English meaning of the words on this dashboard.</p><dl>" + "".join(
-                 f"<dt>{E(t)}</dt><dd>{E(d)}</dd>" for t, d in GUIDE) + "</dl></aside>")
+                 f"<dt>{E(t)}</dt><dd>{E(d)}</dd>" for t, d in guide_for(cfg)) + "</dl></aside>")
     body = (f"<div class='shell'>{side}<main id='app' class='page'>{banner}" + "".join(O + T + A + N + R) + foot + f"</main></div>{guide}")
     css = (UI_DIR / "dashboard.css").read_text(encoding="utf-8")
     js = (UI_DIR / "dashboard.js").read_text(encoding="utf-8")
@@ -669,12 +686,15 @@ def build(conn, db_label, live=False, sources=None, current=None):
 
 def main():
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
+    settings.apply_niche(a.niche)
     conn = db.connect()
     out = Path(a.out) if a.out else settings.ROOT / "reports" / f"report-{datetime.now():%Y%m%d-%H%M}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build(conn, settings.DB_PATH.name), encoding="utf-8")
+    out.write_text(build(conn, settings.DB_PATH.name, niche_cfg=settings.niche(), db_path=settings.DB_PATH),
+                   encoding="utf-8")
     print(f"report written: {out}")
 
 

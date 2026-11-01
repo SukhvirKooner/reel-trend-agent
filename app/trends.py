@@ -20,11 +20,16 @@ from app.schemas import SubgenreName
 
 log = logging.getLogger("trends")
 
-THRESHOLDS = {"hackathon": dict(min_reels=4, min_creators=3), "production": dict(min_reels=8, min_creators=5)}
-MIN_LIFT, MAX_OVERLAP = 1.5, 0.8
-RISING_PCTL = 0.75
+# Mentors / hackathon: softer bars so real short runs can surface trends.
+# Production stays stricter.
+THRESHOLDS = {"hackathon": dict(min_reels=3, min_creators=2), "production": dict(min_reels=8, min_creators=5)}
+MIN_LIFT, MAX_OVERLAP = 1.2, 0.8
+RISING_PCTL = 0.50          # top half of speed_norm counts as "hot" (was top 25%)
+MIN_BREADTH = 2             # distinct rising creators needed for a trend (was 3)
 MEGA = 1_000_000
-MIN_DT_H = 10 / 60      # ignore snapshot pairs closer than 10 min (noise)
+MIN_REACH = 1.0             # views/followers floor (was 2.0)
+MIN_REACH_MEGA = 0.3        # mega-accounts (was 0.5)
+MIN_DT_H = 10 / 60          # ignore snapshot pairs closer than 10 min (noise)
 
 
 # ======================================================================= 8.1 per-reel metrics
@@ -114,19 +119,19 @@ def apply_rising(m):
     m["eng_kind"] = [e[0] for e in eng]
     m["eng_ratio"] = [e[1] for e in eng]
     med = {k: m.loc[m.eng_kind == k, "eng_ratio"].median() for k in ("likes", "comments")}
-    p75 = m["speed_norm"].quantile(RISING_PCTL)
-    p90 = m["speed_norm"].quantile(0.90)
+    p_hot = m["speed_norm"].quantile(RISING_PCTL)
+    p_unknown = m["speed_norm"].quantile(0.75)  # unknown followers → still need top-quartile speed
 
     def why_not(r):
         if r.is_ad:
             return "ad"
-        if r.speed_norm < p75:
-            return "speed below top 25%"
+        if r.speed_norm < p_hot:
+            return f"speed below top {int((1 - RISING_PCTL) * 100)}%"
         if r.reach is None or pd.isna(r.reach):
-            if r.speed_norm < p90:      # follower count unknown → demand top 10% speed instead
-                return "followers unknown & speed < top 10%"
+            if r.speed_norm < p_unknown:
+                return "followers unknown & speed < top 25%"
         else:
-            need = 0.5 if (r.followers or 0) > MEGA else 2.0
+            need = MIN_REACH_MEGA if (r.followers or 0) > MEGA else MIN_REACH
             if r.reach < need:
                 return f"reach {r.reach:.1f} < {need}"
         if r.acceleration is not None and pd.notna(r.acceleration) and r.n_snaps >= 3 and r.acceleration < 0:
@@ -145,7 +150,8 @@ def apply_rising(m):
 
 # ======================================================================= 8.3 sub-genre discovery
 def _style_tags(tags):
-    return sorted({t for t in tags if not t.startswith("dish:")})
+    # entity facets (dish / artist) describe *what*, not the style combo
+    return sorted({t for t in tags if not t.startswith(("dish:", "artist:"))})
 
 
 def discover_subgenres(conn, m, use_llm=True):
@@ -259,8 +265,9 @@ def score_group(m, codes, niche_median_views):
     acc = g.acceleration.dropna()
     accel_avg = float(acc.mean()) if len(acc) else None
     score = breadth * rising_share * (0.5 + momentum) * (0.5 + freshness)
+    ok = breadth >= MIN_BREADTH
     return dict(breadth=int(breadth), rising=int(len(rg)), total=int(len(g)), momentum=momentum,
-                freshness=freshness, score=score if breadth >= 3 else 0.0, eligible=breadth >= 3,
+                freshness=freshness, score=score if ok else 0.0, eligible=ok,
                 accel_avg=accel_avg, median_age_d=med_age_d, median_views=float(g.views.median()),
                 niche_median_views=float(niche_median_views),
                 median_reach=float(rg.reach.dropna().median()) if rg.reach.notna().any() else None,
@@ -335,18 +342,20 @@ def print_summary(conn, m, run_at):
         out.append(f"   {r['label'].upper():9s} {r['kind']:8s} {nm} — {r['breadth']} creators, "
                    f"{r['rising']}/{r['total']} rising, score {r['score']:.2f}")
     if not rows:
-        out.append("   (no trend group has ≥ 3 creators with rising reels yet)")
+        out.append(f"   (no trend group has ≥ {MIN_BREADTH} creators with rising reels yet)")
     print("\n".join(out), flush=True)
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--every", type=float, default=15, help="minutes between runs")
     ap.add_argument("--no-explain", action="store_true", help="don't generate trend cards after each run")
     a = ap.parse_args()
+    settings.apply_niche(a.niche)
     conn = db.connect()
     while True:
         if run_once(conn, not a.no_llm) and not a.no_llm and not a.no_explain:

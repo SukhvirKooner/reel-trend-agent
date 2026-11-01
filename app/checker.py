@@ -305,10 +305,12 @@ def run(once=False, final=False, use_apify=False, profile_dir=None):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     ap = argparse.ArgumentParser()
+    settings.add_niche_arg(ap)
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--final", action="store_true")
     ap.add_argument("--apify", action="store_true")
     ap.add_argument("--profile", default=None,
-                    help="browser profile dir (e.g. ./profiles/scout to reuse the scout login when the scout isn't running)")
+                    help="browser profile dir (defaults to the niche's checker profile)")
     a = ap.parse_args()
+    settings.apply_niche(a.niche)
     run(a.once, a.final, a.apify, a.profile)

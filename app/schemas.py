@@ -3,7 +3,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-Facet = Literal["dish", "format", "hook", "setting", "audio", "emotion"]
+Facet = Literal["dish", "artist", "format", "hook", "setting", "audio", "emotion"]
 
 
 class FacetTag(BaseModel):
@@ -13,8 +13,8 @@ class FacetTag(BaseModel):
 
 
 class QuickTag(BaseModel):
-    niche_score: float = Field(description="0-1: how clearly this is Indian street food content")
-    food_related: float = Field(description="0-1: any food content at all")
+    niche_score: float = Field(description="0-1: how clearly this matches the configured niche")
+    food_related: float = Field(description="0-1: soft relatedness to the niche topic (field name is historical)")
     branch: Optional[str] = Field(description="one of the given branches, or null")
     tags: list[FacetTag]
     language: str

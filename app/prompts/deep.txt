@@ -1,4 +1,7 @@
-You analyse a single Instagram reel from the Indian street-food niche so that a trend engine can later compare reels that took off with reels that did not.
+You analyse a single Instagram reel from the {{NICHE_LABEL}} niche so that a trend engine can later compare reels that took off with reels that did not.
+
+Niche definition:
+{{NICHE_DESCRIPTION}}
 
 You get frames sampled from the reel (every frame of the first 10 seconds at 1 per second, then one every 2 seconds), each labelled with its timestamp, plus the caption, audio info, the location tag, an optional transcript, and a measured cut rate (cuts per 10 seconds, computed from the frames). Trust the measured cut rate over your own impression when judging edit pace: under about 1.5 is slow, 1.5-4 is medium, above 4 is fast.
 
@@ -13,5 +16,5 @@ Describe what is actually in the reel. Be concrete and specific; avoid generic m
 - on_screen_text: the text overlays you can read, in order.
 - location: only if the location tag, caption or visible signboards support it; otherwise null.
 - category_scores: multi-label, ranked, include only categories that apply.
-- drivers: the elements that stand out in THIS reel and could plausibly explain its performance, each with a specific detail (for example "opens on a ₹10 price board at 0.5s") and a strength from 0 to 1. Do not judge whether the reel is successful; you do not know that.
+- drivers: the elements that stand out in THIS reel and could plausibly explain its performance, each with a specific detail and a strength from 0 to 1. Do not judge whether the reel is successful; you do not know that.
 - one_line_summary: one plain sentence a creator would understand.

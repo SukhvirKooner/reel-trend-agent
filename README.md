@@ -1,6 +1,6 @@
-# Reel Trend Agent: Indian street food, Delhi
+# Reel Trend Agent
 
-This is the implementation of `~/reel-trend-agent-hackathon-plan.md`. A scout bot watches Reels and saves links and metadata. A checker re-opens the links to record view counts over time. A trend engine finds rising reels and the sub-genres, sounds and locations behind them. An explainer writes a "why it works" card with a playbook. A Streamlit UI shows the results.
+Multi-niche Instagram Reels trend finder. **Street food (Delhi)** and **Concert reels (Diljit-focused)** each have their own Instagram account, browser profile, SQLite database, and category config under `config/niches.yaml`. A scout watches Reels and saves links and metadata. A checker re-opens the links to record view counts over time. A trend engine finds rising reels and the sub-genres, sounds and locations behind them. An explainer writes a "why it works" card with a playbook.
 
 ```
 app/scout.py     Process 1  Playwright scout: glance → quick tag → watch/skip → save link + frames
@@ -18,24 +18,36 @@ ui.py                       Streamlit: niche tree, trend card, agent live view, 
 4. **DevTools field check (plan section 2.4).** Confirm the field names Instagram uses right now, then edit `FIELD_VIEWS`, `FIELD_FOLLOWERS` and `parse_reel()` in `app/ig_parse.py`. To check quickly: log in, run `python -m app.scout --no-tag --minutes 2`, and look at `reels` and `snapshots` in `data/app.db`.
 5. Connect the scout laptop to the **Indian mobile hotspot**. Never run the scout from a datacenter IP.
 
+## Niches (street food stays; concert is additive)
+| Niche | Flag | Instagram profile | Database | Config |
+|-------|------|-------------------|----------|--------|
+| Street food (default) | `--niche street_food` | `profiles/scout` | `data/app.db` | `config/street_food.yaml` |
+| Concert (Diljit focus) | `--niche concert` | `profiles/concert` | `data/concert.db` | `config/concert.yaml` |
+
+First time on concert: log into the **new** Instagram account in the Chrome window that opens for `profiles/concert`. Street-food login and data are untouched.
+
 ## Run order. Start M1 as early as possible, because views over time need *time*.
 ```bash
-python -m app.scout                 # M1  log in by hand in the window the first time
-python -m app.checker               # M2  separate window and account; log in by hand the first time
-python -m app.analyzer              # M3  quick-tags any backlog, deep-analyzes in-niche reels, tidies tags every 30 min
-python -m app.trends                # M4+M5  runs every 15 min and generates trend cards after each run
-streamlit run ui.py                 # M6
-crontab -e  →  */30 * * * * ~/reel-trend-agent/scripts/snapshot_db.sh
+# Street food (default)
+python -m app.scout --no-like --start-search
+python -m app.checker
+python -m app.analyzer
+python -m app.trends
+
+# Concert (separate account + DB)
+python -m app.scout --niche concert --no-like --start-search
+python -m app.checker --niche concert
+python -m app.analyzer --niche concert
+python -m app.trends --niche concert
 ```
-- `python -m app.scout --no-tag` saves reels without calling Claude. The analyzer tags that backlog later. Use this before the quick-tag call works.
-- If the scout stops with a challenge or "action blocked" page, do **not** solve it automatically. Restart it on the spare account: `python -m app.scout --profile ./profiles/checker --account scout2`.
-- If the checker gets blocked, run `APIFY_TOKEN=... python -m app.checker --apify`. Confirm the actor name and its output fields first.
+- `python -m app.scout --no-tag` saves reels without calling Claude. The analyzer tags that backlog later.
+- If the scout stops with a challenge or "action blocked" page, do **not** solve it automatically.
 - At the end of the hackathon, run `python -m app.checker --once --final` to re-check reels older than 14 days one last time.
 
 ## Dashboard (show this to mentors)
 ```bash
-python -m app.dashboard          # → http://localhost:8080   (Live data · Demo data · frozen backups: switch in the sidebar)
-python -m app.report             # → reports/report-*.html   (same page as one offline file to send around)
+python -m app.dashboard          # → http://localhost:8080   (Street food · Concert · Demo · frozen backups in the sidebar)
+python -m app.report --niche concert
 ```
 Left sidebar with five pages: **Overview** (plain-English headline: trend found or progress towards the first one,
 agent pulse of its last decisions, KPIs, pipeline funnel, latest decisions, fastest-growing reels, how it works) ·
@@ -65,7 +77,8 @@ DB_PATH=./data/demo.db streamlit run ui.py
 ## Small deviations from the plan
 - The branch `hygiene_and_exposé` is spelled `hygiene_and_expose` (ASCII only).
 - Tags are stored as `facet:tag`. Sub-genres must combine tags from **different** facets, so they describe a style rather than a pair of synonyms.
-- If a creator's follower count is still unknown, `reach` can't be computed. In that case a reel counts as rising only if its speed is in the top 10% (instead of the usual top 25%).
+- Hackathon thresholds are softened for mentor demos: rising = top 50% speed (not 25%), reach ≥ 1× followers, trend needs ≥ 2 rising creators, sub-genres need ≥ 3 reels / 2 creators and lift ≥ 1.2.
+- If a creator's follower count is still unknown, `reach` can't be computed. In that case a reel counts as rising only if its speed is in the top 25%.
 - Groups that are eligible but are not top-5, emerging or saturated get the label `active`.
 - Opus calls use server-side refusal fallbacks (`fallbacks: "default"`). A false-positive refusal on a reel is then retried on a fallback model instead of the reel being skipped.
 

@@ -28,7 +28,7 @@ def test_buckets():
 def test_lift_table_math():
     feats = {f"W{i}": {"hook=price"} for i in range(3)} | {"W3": {"pace=fast"}}
     feats |= {"O0": {"hook=price"}} | {f"O{i}": set() for i in range(1, 10)}
-    feats |= {"W0": {"hook=price", "rare=1"}, "W1": {"hook=price", "rare=1"}}       # rare: only 2 winners
+    feats |= {"W0": {"hook=price", "rare=1"}}                                        # rare: only 1 winner → below MIN_WINNERS
     feats |= {f"W{i}": feats[f"W{i}"] | {"common=1"} for i in range(4)}
     feats |= {f"O{i}": feats[f"O{i}"] | {"common=1"} for i in range(10)}             # everywhere → lift 1
     winners, others = [f"W{i}" for i in range(4)], [f"O{i}" for i in range(10)]

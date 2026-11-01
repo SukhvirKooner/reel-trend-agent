@@ -1,4 +1,9 @@
 niche: indian_street_food
+label: Indian street food
+short_label: Street food
+score_name: Street-food score
+creator_audience: Indian street-food creators
+entity_facet: dish
 region: IN-DL
 description: >
   Reels about food sold by street vendors, dhabas, carts and small stalls in India:
