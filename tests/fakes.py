@@ -75,7 +75,7 @@ class FakePage:
     def get_attribute(self, sel, attr, timeout=None):
         return self.og_desc
 
-    def goto(self, url, wait_until=None):
+    def goto(self, url, wait_until=None, timeout=None, **kwargs):
         self.url = url
         self.gotos.append(url)
         if self.on_goto:

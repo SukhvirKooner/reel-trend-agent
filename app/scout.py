@@ -29,7 +29,11 @@ log = logging.getLogger("scout")
 EPSILON = 0.15
 NUDGE_EVERY = 40
 DRIFT_WINDOW, DRIFT_MIN_SHARE = 30, 0.40
-EARLY_DRIFT = 10            # 10 off-niche reels in a row → nudge right away
+EARLY_DRIFT = 4             # off-niche streak on the feed before we re-nudge (was 10 — too slow to warm)
+FEED_PROBE_MAX = 5          # when probing a cold feed, bail back to search after this many misses
+COLD_SHARE = 0.35           # recent in-niche share below this → feed still cold
+SEARCH_BATCH_COLD = (5, 8)  # watch more from search while the feed is cold
+SEARCH_BATCH_WARM = (3, 5)
 LIKE_EVERY = (8, 10)
 LIKES_PER_HOUR = 40
 
@@ -99,6 +103,12 @@ class Scout:
         self.next_like_gap = random.randint(*LIKE_EVERY)
         self.session_start = time.time()
         self.next_pause = time.time() + random.uniform(15, 25) * 60
+        # Cold accounts: Instagram does NOT put search/watch signal into /reels/ immediately.
+        # Niche saves from search must NOT count as "feed is warm" — only a real /reels/ hit does.
+        self.search_mode = True
+        self.feed_misses = 0
+        self.nudges_done = 0
+        self.saw_feed_niche = False
         # resume branch coverage from previous runs
         for r in conn.execute("SELECT branch, COUNT(*) n FROM quick_tags q JOIN reels USING(code) "
                               "WHERE in_niche=1 GROUP BY branch"):
@@ -336,14 +346,49 @@ class Scout:
         self.conn.commit()
 
     # ------------------------------------------------------------ exploration
-    def search_nudge(self, branch, why):
+    def niche_total(self):
+        return sum(self.branch_counts.values())
+
+    def recent_share(self):
+        if not self.recent:
+            return 0.0
+        return sum(self.recent) / len(self.recent)
+
+    def feed_is_cold(self):
+        """True until Instagram's /reels/ feed is actually serving niche content.
+
+        Watching search results does not warm the home Reels feed immediately — the concert run
+        proved this (watch 3–4 Diljit clips from search → 10 straight off-niche skips on /reels/).
+        In-niche rows already in the DB usually came from search, so they do not count as warm.
+        """
+        if not self.saw_feed_niche:
+            return True
+        if len(self.recent) >= EARLY_DRIFT and self.recent_share() < COLD_SHARE:
+            return True
+        return False
+
+    def pick_nudge_branch(self, prefer_strong=True):
+        if prefer_strong and self.niche_total():
+            return self.branch_counts.most_common(1)[0][0]
+        return min(self.branch_counts, key=lambda b: self.branch_counts[b])
+
+    def search_nudge(self, branch, why, return_to_feed=None):
         kws = (settings.niche().get("exploration_keywords") or {}).get(branch) or [branch.replace("_", " ")]
         kw = random.choice(kws)
+        cold = self.feed_is_cold()
         self.log(None, "search_nudge", branch, reason=f"{why}: '{kw}'")
         self.last_nudge_n = self.n_reels
+        self.nudges_done += 1
         goto_ig(self.page, f"https://www.instagram.com/explore/search/keyword/?q={quote(kw)}")
         self.human_sleep(3, 5)
         self.check_blocked()
+        # scroll the results grid a bit so we get more than the first row
+        try:
+            for _ in range(random.randint(1, 3)):
+                self.page.mouse.wheel(0, random.randint(600, 1000))
+                self.human_sleep(0.8, 1.5)
+        except Exception:
+            pass
         links = self.page.eval_on_selector_all(
             "a[href*='/reel/'], a[href*='/p/']", "els => [...new Set(els.map(e => e.href))]")
         codes = [c for c in dict.fromkeys(ig_parse.code_from_url(h) for h in links) if c]
@@ -356,32 +401,90 @@ class Scout:
         seen = {r[0] for r in self.conn.execute(
             f"SELECT code FROM reels WHERE code IN ({','.join('?' * len(pool))})", pool)} if pool else set()
         pool = [c for c in pool if c not in seen] + [c for c in pool if c in seen]   # unseen first
-        for code in pool[:random.randint(3, 5)]:
-            goto_ig(self.page, f"https://www.instagram.com/reel/{code}/")
+        batch = SEARCH_BATCH_COLD if cold else SEARCH_BATCH_WARM
+        n_watch = random.randint(*batch)
+        watched = 0
+        for code in pool[:n_watch]:
+            try:
+                goto_ig(self.page, f"https://www.instagram.com/reel/{code}/")
+            except Exception as e:
+                log.warning("nudge navigate failed: %s", e)
+                continue
             self.human_sleep(1.5, 2.5)
             self.check_blocked()
             try:
                 self.handle_reel(source="nudge")
+                watched += 1
             except BlockedError:
                 raise
             except Exception as e:
                 log.warning("nudge reel failed: %s", e)
-        goto_ig(self.page, "https://www.instagram.com/reels/")
-        self.human_sleep(3, 5)
+        if return_to_feed is None:
+            # Stay on search while the feed is cold — jumping to /reels/ just burns skips.
+            return_to_feed = not cold
+        if return_to_feed:
+            self.search_mode = False
+            self.feed_misses = 0
+            goto_ig(self.page, "https://www.instagram.com/reels/")
+            self.human_sleep(3, 5)
+        else:
+            self.search_mode = True
+            self.log(None, "stay_on_search", branch,
+                     reason=f"feed cold (niche={self.niche_total()}, share={self.recent_share():.0%}); "
+                            f"watched {watched} from search, not returning to /reels/")
 
     def exploration_step(self):
         last = list(self.recent)[-EARLY_DRIFT:]
         if len(last) == EARLY_DRIFT and sum(last) == 0:
-            strongest = self.branch_counts.most_common(1)[0][0]
-            self.search_nudge(strongest, f"early drift guard (last {EARLY_DRIFT} reels all off-niche)")
+            self.search_mode = True
+            self.search_nudge(self.pick_nudge_branch(True),
+                              f"early drift guard (last {EARLY_DRIFT} reels all off-niche)")
             self.recent.clear()
+            self.feed_misses = 0
         elif len(self.recent) >= DRIFT_WINDOW and sum(self.recent) / len(self.recent) < DRIFT_MIN_SHARE:
-            strongest = self.branch_counts.most_common(1)[0][0]
-            self.search_nudge(strongest, f"drift guard (in-niche share {sum(self.recent)}/{len(self.recent)})")
+            self.search_mode = True
+            self.search_nudge(self.pick_nudge_branch(True),
+                              f"drift guard (in-niche share {sum(self.recent)}/{len(self.recent)})")
             self.recent.clear()
+            self.feed_misses = 0
         elif self.n_reels - self.last_nudge_n >= NUDGE_EVERY:
-            weakest = min(self.branch_counts, key=lambda b: self.branch_counts[b])
-            self.search_nudge(weakest, f"least-covered branch ({self.branch_counts[weakest]} reels)")
+            self.search_nudge(self.pick_nudge_branch(False),
+                              f"least-covered branch ({self.branch_counts[self.pick_nudge_branch(False)]} reels)")
+
+    def harvest_or_probe(self):
+        """While the feed is cold: keep harvesting search. Every few nudges, briefly probe /reels/."""
+        # Occasional feed probe to see if Instagram started serving niche content
+        if self.nudges_done and self.nudges_done % 3 == 0 and self.search_mode:
+            self.log(None, "feed_probe", reason=f"checking whether /reels/ warmed (after {self.nudges_done} nudges)")
+            goto_ig(self.page, "https://www.instagram.com/reels/")
+            self.human_sleep(3, 5)
+            self.feed_misses = 0
+            for _ in range(FEED_PROBE_MAX):
+                if self.max_reels and self.n_reels >= self.max_reels:
+                    return
+                self.check_blocked()
+                try:
+                    hit = self.handle_reel()
+                except BlockedError:
+                    raise
+                except Exception as e:
+                    log.warning("feed probe reel failed: %s", e)
+                    hit = 0
+                if hit:
+                    self.feed_misses = 0
+                    self.saw_feed_niche = True
+                    self.search_mode = False
+                    self.log(None, "feed_warm", reason="in-niche reel appeared on /reels/ — leaving search mode")
+                    return
+                self.feed_misses += 1
+                self.next_reel()
+            self.search_mode = True
+            self.log(None, "feed_still_cold",
+                     reason=f"{self.feed_misses} off-niche on /reels/ probe — back to search harvest")
+        # Default: another search harvest (rotate weak/strong branches)
+        prefer_strong = self.nudges_done % 2 == 0
+        why = "search harvest (feed cold; not relying on /reels/ yet)"
+        self.search_nudge(self.pick_nudge_branch(prefer_strong), why)
 
     # ------------------------------------------------------------ main loop
     def run(self, session_minutes):
@@ -390,6 +493,20 @@ class Scout:
                 self.log(None, "done", reason=f"reached --max-reels {self.max_reels}")
                 return True
             self.check_blocked()
+            if self.search_mode or self.feed_is_cold():
+                try:
+                    self.harvest_or_probe()
+                except BlockedError:
+                    raise
+                except Exception as e:
+                    log.warning("search harvest failed: %s", e)
+                    self.human_sleep(2, 4)
+                if time.time() > self.next_pause:
+                    p = random.uniform(30, 90)
+                    self.log(None, "pause", reason=f"human pause {p:.0f}s")
+                    time.sleep(p)
+                    self.next_pause = time.time() + random.uniform(15, 25) * 60
+                continue
             try:
                 self.handle_reel()
             except BlockedError:

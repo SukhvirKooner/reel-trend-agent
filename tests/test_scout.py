@@ -253,20 +253,37 @@ def test_exploration_nudges(env, monkeypatch):
     sc.exploration_step()
     assert calls[-1][0] == "price_and_value" and "drift" in calls[-1][1]
     assert len(sc.recent) == 0
+    sc.recent.extend([0] * S.EARLY_DRIFT)                               # short off-niche streak → early drift
+    sc.exploration_step()
+    assert "early drift" in calls[-1][1]
 
 
-def test_search_nudge_visits_results_and_returns(env, monkeypatch):
+def test_search_nudge_stays_off_reels_when_feed_cold(env, monkeypatch):
+    """Cold feed: harvest search results and do NOT bounce back to /reels/ (Instagram won't warm yet)."""
     sc, page, clock, state, conn = env
     page.links = [f"https://www.instagram.com/reel/NUDGE{i}/" for i in range(8)]   # none cached → use all
     monkeypatch.setattr(S.random, "randint", lambda a, b: 3)
+    assert sc.feed_is_cold()
     sc.search_nudge("hygiene_and_expose", "test")
     reel_visits = [u for u in page.gotos if "/reel/" in u]
     assert len(reel_visits) == 3
     assert "explore/search/keyword/?q=street%20food%20hygiene%20check" in page.gotos[0]
-    assert page.gotos[-1] == "https://www.instagram.com/reels/"
+    assert not any(u.rstrip("/").endswith("/reels") for u in page.gotos)
     acts = [r[0] for r in conn.execute("SELECT action FROM agent_log ORDER BY rowid")]
     assert acts[0] == "search_nudge" and acts.count("watch_full") == 3
-    assert sc.last_nudge_n == 0
+    assert "stay_on_search" in acts and sc.search_mode is True
+
+
+def test_search_nudge_returns_to_reels_when_feed_warm(env, monkeypatch):
+    sc, page, clock, state, conn = env
+    page.links = [f"https://www.instagram.com/reel/NUDGE{i}/" for i in range(8)]
+    monkeypatch.setattr(S.random, "randint", lambda a, b: 3)
+    sc.saw_feed_niche = True                                             # only a real /reels/ hit warms the feed
+    sc.recent.extend([1] * 10)
+    assert not sc.feed_is_cold()
+    sc.search_nudge("hygiene_and_expose", "test")
+    assert page.gotos[-1] == "https://www.instagram.com/reels/"
+    assert sc.search_mode is False
 
 
 def test_next_reel_uses_keyboard_or_wheel(env, monkeypatch):
@@ -336,7 +353,7 @@ def test_early_drift_guard(env, monkeypatch):
     sc, page, clock, state, conn = env
     calls = []
     monkeypatch.setattr(sc, "search_nudge", lambda b, why: calls.append((b, why)))
-    sc.recent.extend([0] * 9)
+    sc.recent.extend([0] * (S.EARLY_DRIFT - 1))
     sc.exploration_step()
     assert calls == []
     sc.recent.append(0)
